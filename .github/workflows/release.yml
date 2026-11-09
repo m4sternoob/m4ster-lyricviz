@@ -1,0 +1,58 @@
+name: Build desktop release
+
+# Builds the LyricViz desktop apps and publishes them on a GitHub
+# release. Runs when a version tag (v*) is pushed, or on demand.
+#
+#   Windows — NSIS installer (.exe), x64
+#   macOS   — DMG (.dmg), Apple Silicon (aarch64) only. Current
+#             Macs are all Apple Silicon, and a native ARM build
+#             is smaller and faster than a universal one.
+#
+# Both jobs publish to the same release for the tag.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Build app and publish to the release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
+          releaseName: "LyricViz ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}"
+          releaseBody: "LyricViz v1.0.0 — lyric visualizer with synced, word-by-word lyrics over audio-reactive visuals (Constellation, Aura, Orbit and Poly). Windows: LyricViz_1.0.0_x64-setup.exe. macOS (Apple Silicon): LyricViz_1.0.0_aarch64.dmg. Both builds are unsigned: on Windows, choose 'More info' → 'Run anyway' if SmartScreen asks; on macOS, right-click the app and choose Open on first launch."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
