@@ -1,0 +1,1 @@
+{"$schema":"../gen/schemas/desktop-schema.json","description":"Default permissions for the main LyricViz window.","identifier":"default","permissions":["core:default"],"windows":["main"]}
