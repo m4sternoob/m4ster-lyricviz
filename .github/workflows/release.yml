@@ -50,9 +50,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
-          releaseName: "LyricViz ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}"
-          releaseBody: "LyricViz v1.0.0 — lyric visualizer with synced, word-by-word lyrics over audio-reactive visuals (Constellation, Aura, Orbit and Poly). Windows: LyricViz_1.0.0_x64-setup.exe. macOS (Apple Silicon): LyricViz_1.0.0_aarch64.dmg. Both builds are unsigned: on Windows, choose 'More info' → 'Run anyway' if SmartScreen asks; on macOS, right-click the app and choose Open on first launch."
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}
+          releaseName: "LyricViz ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.1' }}"
+          releaseBody: "LyricViz v1.0.1 — lyric visualizer with synced, word-by-word lyrics over audio-reactive visuals (Constellation, Aura, Orbit and Poly). Windows fix: the installer now embeds the WebView2 bootstrapper instead of downloading it during setup, so the app window renders on machines where that download failed. Windows: LyricViz_1.0.1_x64-setup.exe. macOS (Apple Silicon): LyricViz_1.0.1_aarch64.dmg. Both builds are unsigned: on Windows, choose 'More info' → 'Run anyway' if SmartScreen asks; on macOS, right-click the app and choose Open on first launch."
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
