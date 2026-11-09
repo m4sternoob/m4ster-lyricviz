@@ -9,10 +9,10 @@ any static host (or a local server) in Chrome or Edge.
 
 **Live (web):** https://m4ster-lyricviz.vercel.app
 
-**Desktop downloads (v1.0.0):**
+**Desktop downloads (v1.0.1):**
 
-- Windows (.exe installer): https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.0/LyricViz_1.0.0_x64-setup.exe
-- macOS (.dmg, Apple Silicon): https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.0/LyricViz_1.0.0_aarch64.dmg
+- Windows (.exe installer): https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.1/LyricViz_1.0.1_x64-setup.exe
+- macOS (.dmg, Apple Silicon): https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.1/LyricViz_1.0.1_aarch64.dmg
 
 The same download buttons, with the version on each button, are in the
 web app's control sheet.
@@ -84,8 +84,10 @@ Pushing a version tag (`v*`) runs the `Build desktop release`
 workflow, which builds both platforms and publishes them on that
 tag's GitHub release:
 
-- **Windows** — `LyricViz_1.0.0_x64-setup.exe` (NSIS installer, x64)
-- **macOS** — `LyricViz_1.0.0_aarch64.dmg`, Apple Silicon only. A
+- **Windows** — `LyricViz_1.0.1_x64-setup.exe` (NSIS installer, x64;
+  the WebView2 bootstrapper is embedded in the installer rather
+  than downloaded during setup)
+- **macOS** — `LyricViz_1.0.1_aarch64.dmg`, Apple Silicon only. A
   native ARM build is smaller and faster than a universal one, and
   current Macs are all Apple Silicon.
 
