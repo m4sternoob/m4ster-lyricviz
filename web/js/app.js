@@ -391,6 +391,9 @@ document.querySelectorAll("#modePicker .seg").forEach((btn) =>
     document.querySelectorAll("#modePicker .seg").forEach((b) =>
       b.classList.toggle("active", b === btn));
     Visualizer.setMode(btn.dataset.mode);
+    // Force a constellation point rebuild on the next frame so
+    // switching back to Constellation never shows a stale line.
+    wordCentresDirty = true;
   }));
 
 // ---------- Lyrics loading and search ----------
@@ -528,6 +531,7 @@ function updateLyrics(now) {
   }
 
   const spans = lineCurrent.querySelectorAll(".word");
+  const centresWereDirty = wordCentresDirty;
 
   if (wordCentresDirty) {
     wordCentres = [...spans].map((span) => {
@@ -537,10 +541,11 @@ function updateLyrics(now) {
     wordCentresDirty = false;
   }
 
-  // Mark each word sung / now, and pair it with its cached
-  // centre so the constellation stars sit on the words.
-  const points = [];
-  spans.forEach((span, i) => {
+  // Mark each word sung / now. The constellation points are
+  // rebuilt only when a centre moved or a word actually changed
+  // state — a few times per line, not on every animation frame.
+  let statesChanged = false;
+  spans.forEach((span) => {
     const start = Number(span.dataset.start);
     const end = Number(span.dataset.end);
     const sung = lyricTime >= end;
@@ -548,12 +553,21 @@ function updateLyrics(now) {
     if (span._sung !== sung || span._now !== nowWord) {
       span._sung = sung;
       span._now = nowWord;
+      statesChanged = true;
       span.classList.toggle("sung", sung || nowWord);
       span.classList.toggle("now", nowWord);
     }
-    if (wordCentres[i]) points.push({ ...wordCentres[i], sung, now: nowWord });
   });
-  if (Visualizer.mode === "constellation") Visualizer.setWordPoints(points);
+
+  if (Visualizer.mode === "constellation" && (centresWereDirty || statesChanged)) {
+    const points = [];
+    spans.forEach((span, i) => {
+      if (wordCentres[i]) {
+        points.push({ ...wordCentres[i], sung: !!span._sung, now: !!span._now });
+      }
+    });
+    Visualizer.setWordPoints(points);
+  }
 }
 
 // ---------- Main loop ----------
@@ -565,16 +579,36 @@ function formatTime(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// The clock text and seek position only change a few times a
+// second — writing them to the DOM on every animation frame
+// (120 times a second) is wasted layout work, so writes happen
+// only when the visible value actually changes.
+let lastTimeText = "";
+let lastTotalText = "";
+let lastSeekValue = -1;
+
 function tick() {
   requestAnimationFrame(tick);
   const now = currentTime();
 
   updateLyrics(now);
 
-  timeNow.textContent = formatTime(now);
-  timeTotal.textContent = formatTime(state.duration);
+  const nowText = formatTime(now);
+  if (nowText !== lastTimeText) {
+    timeNow.textContent = nowText;
+    lastTimeText = nowText;
+  }
+  const totalText = formatTime(state.duration);
+  if (totalText !== lastTotalText) {
+    timeTotal.textContent = totalText;
+    lastTotalText = totalText;
+  }
   if (state.duration > 0 && document.activeElement !== seekBar) {
-    seekBar.value = Math.min((now / state.duration) * 100, 100);
+    const seekValue = Math.min((now / state.duration) * 100, 100);
+    if (Math.abs(seekValue - lastSeekValue) >= 0.25) {
+      seekBar.value = seekValue;
+      lastSeekValue = seekValue;
+    }
   }
 
   // Live timer and demo loop both end at the known duration.

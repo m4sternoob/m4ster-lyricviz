@@ -145,11 +145,12 @@ const Visualizer = {
     for (let r = 0; r <= rows; r++) {
       for (let c = 0; c <= cols; c++) {
         const edge = r === 0 || c === 0 || r === rows || c === cols;
-        points.push({
-          x: (c / cols) * w + (edge ? 0 : (Math.random() - 0.5) * 46),
-          y: (r / rows) * h + (edge ? 0 : (Math.random() - 0.5) * 46),
-          phase: Math.random() * Math.PI * 2,
-        });
+        const px = (c / cols) * w + (edge ? 0 : (Math.random() - 0.5) * 46);
+        const py = (r / rows) * h + (edge ? 0 : (Math.random() - 0.5) * 46);
+        // x/y are the rest position; mx/my are the per-frame
+        // moved position, mutated in place so the frame loop
+        // allocates nothing.
+        points.push({ x: px, y: py, mx: px, my: py, phase: Math.random() * Math.PI * 2 });
       }
     }
 
@@ -164,7 +165,25 @@ const Visualizer = {
     this.polyMesh = { points, triangles };
   },
 
-  setMode(mode) { this.mode = mode; },
+  // Mode changes crossfade: the last frame of the old mode is
+  // snapshotted once and faded out over the new mode (~320 ms),
+  // instead of a hard cut. One full-screen copy per switch —
+  // cheap — and skipped entirely for reduced-motion users.
+  fadeCanvas: null,
+  fadeStart: 0,
+
+  setMode(mode) {
+    if (mode === this.mode) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (this.canvas && this.canvas.width > 0 && !reduce) {
+      if (!this.fadeCanvas) this.fadeCanvas = document.createElement("canvas");
+      this.fadeCanvas.width = this.canvas.width;
+      this.fadeCanvas.height = this.canvas.height;
+      this.fadeCanvas.getContext("2d").drawImage(this.canvas, 0, 0);
+      this.fadeStart = performance.now();
+    }
+    this.mode = mode;
+  },
 
   /** Connect (or disconnect, with null) a Web Audio analyser. */
   setAnalyser(analyser) {
@@ -231,14 +250,28 @@ const Visualizer = {
 
     if (this.mode === "poly") {
       this.drawPoly(now, w, h);
-      return;
+    } else {
+      this.drawStarfield(now, w, h);
+
+      if (this.mode === "aura") this.drawAura(now, w, h);
+      else if (this.mode === "orbit") this.drawOrbit(now, w, h);
+      else this.drawConstellation(now, w, h);
     }
 
-    this.drawStarfield(now, w, h);
-
-    if (this.mode === "aura") this.drawAura(now, w, h);
-    else if (this.mode === "orbit") this.drawOrbit(now, w, h);
-    else this.drawConstellation(now, w, h);
+    // Crossfade: stamp the previous mode's last frame over the
+    // new one with fading alpha until the switch has settled.
+    if (this.fadeStart) {
+      const progress = (performance.now() - this.fadeStart) / 320;
+      if (progress >= 1 || !this.fadeCanvas) {
+        this.fadeStart = 0;
+      } else {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1 - progress;
+        ctx.drawImage(this.fadeCanvas, 0, 0, this.canvas.width, this.canvas.height);
+        ctx.restore();
+      }
+    }
   },
 
   // Measure the real frame rate and govern quality: if frames
@@ -270,10 +303,10 @@ const Visualizer = {
 
   drawStarfield(now, w, h) {
     const { ctx } = this;
+    ctx.fillStyle = "#dbeafe";
     for (const star of this.stars) {
       const twinkle = 0.35 + 0.3 * Math.sin(now / 900 + star.phase);
       ctx.globalAlpha = Math.max(twinkle, 0.06) * (0.5 + this.treble * 0.7);
-      ctx.fillStyle = "#dbeafe";
       ctx.beginPath();
       ctx.arc(star.x * w, star.y * h, star.r, 0, Math.PI * 2);
       ctx.fill();
@@ -303,6 +336,9 @@ const Visualizer = {
 
     // Spectrum bars arranged in a circle.
     const bars = 72;
+    const reach = Math.min(w, h) * 0.16;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
     for (let i = 0; i < bars; i++) {
       let v;
       if (this.freqData) {
@@ -311,16 +347,16 @@ const Visualizer = {
         v = 0.25 + 0.55 * Math.abs(Math.sin(now / 480 + i * 0.55)) * (0.4 + this.level);
       }
       const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
-      const len = 12 + v * Math.min(w, h) * 0.16;
-      const x1 = cx + Math.cos(angle) * base;
-      const y1 = cy + Math.sin(angle) * base;
-      const x2 = cx + Math.cos(angle) * (base + len);
-      const y2 = cy + Math.sin(angle) * (base + len);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const len = 12 + v * reach;
+      const x1 = cx + cos * base;
+      const y1 = cy + sin * base;
+      const x2 = cx + cos * (base + len);
+      const y2 = cy + sin * (base + len);
 
       ctx.strokeStyle = i % 3 === 0 ? "#22d3ee" : "#818cf8";
       ctx.globalAlpha = 0.35 + v * 0.6;
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
@@ -392,28 +428,35 @@ const Visualizer = {
     const t = now / 1000;
     const palette = ["#164e63", "#1e3a5f", "#312e81", "#155e75", "#3730a3", "#0e7490"];
     const lift = 10 + this.bass * 34;
+    const points = mesh.points;
 
-    // Move the points: two sine waves mixed, scaled by the bass.
-    const moved = mesh.points.map((p) => ({
-      x: p.x,
-      y: p.y + Math.sin(t * 1.4 + p.phase + p.x * 0.004) * lift
-             + Math.cos(t * 0.9 + p.y * 0.005) * lift * 0.4,
-    }));
+    // Move the points in place: two sine waves mixed, scaled by
+    // the bass. No new arrays or objects — at 120 fps, per-frame
+    // allocation is what feeds the garbage collector.
+    for (const p of points) {
+      p.mx = p.x;
+      p.my = p.y + Math.sin(t * 1.4 + p.phase + p.x * 0.004) * lift
+                 + Math.cos(t * 0.9 + p.y * 0.005) * lift * 0.4;
+    }
 
-    mesh.triangles.forEach((tri, i) => {
-      const [a, b, c] = tri.map((idx) => moved[idx]);
+    const triangles = mesh.triangles;
+    for (let i = 0; i < triangles.length; i++) {
+      const tri = triangles[i];
+      const a = points[tri[0]];
+      const b = points[tri[1]];
+      const c = points[tri[2]];
       // Brightness shimmer per triangle, from treble + position.
       const shimmer = 0.55 + this.treble * 0.8
         + 0.25 * Math.sin(t * 2 + i * 1.7);
       ctx.globalAlpha = Math.min(Math.max(shimmer, 0.25), 1);
       ctx.fillStyle = palette[i % palette.length];
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.lineTo(c.x, c.y);
+      ctx.moveTo(a.mx, a.my);
+      ctx.lineTo(b.mx, b.my);
+      ctx.lineTo(c.mx, c.my);
       ctx.closePath();
       ctx.fill();
-    });
+    }
     ctx.globalAlpha = 1;
 
     // A soft centre glow so lyrics stay the focus — one sprite.
