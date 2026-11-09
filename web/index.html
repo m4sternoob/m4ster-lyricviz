@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LyricViz — Lyrics that move with the music</title>
+<meta name="description" content="A lyric visualizer for Windows and the browser. Play Spotify, a local file, or the built-in demo and watch synced lyrics light up word by word.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Full-screen visualizer canvas. All drawing happens in js/visualizer.js -->
+<canvas id="stage" aria-hidden="true"></canvas>
+<div class="stage-shade" aria-hidden="true"></div>
+
+<div class="app">
+
+  <!-- Top glass bar -->
+  <header class="glass bar">
+    <a class="brand" href="#" id="logoHome" title="LyricViz home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="30" height="30" fill="none">
+          <rect x="6" y="18" width="4.5" height="12" rx="2.25" fill="#22d3ee"/>
+          <rect x="14" y="11" width="4.5" height="26" rx="2.25" fill="#818cf8"/>
+          <rect x="22" y="7"  width="4.5" height="34" rx="2.25" fill="#e8ecf3"/>
+          <rect x="30" y="14" width="4.5" height="20" rx="2.25" fill="#818cf8"/>
+          <rect x="38" y="20" width="4.5" height="8"  rx="2.25" fill="#22d3ee"/>
+        </svg>
+      </span>
+      <span class="brand-name">Lyric<em>Viz</em></span>
+    </a>
+
+    <!-- Visualizer style picker (iOS segmented control) -->
+    <div class="segmented" role="tablist" aria-label="Visualizer style" id="modePicker">
+      <button class="seg active" data-mode="constellation" role="tab">Constellation</button>
+      <button class="seg" data-mode="aura" role="tab">Aura</button>
+      <button class="seg" data-mode="orbit" role="tab">Orbit</button>
+      <button class="seg" data-mode="poly" role="tab">Poly</button>
+    </div>
+
+    <span class="fps-pill" id="fpsMeter" title="Frames per second — the visualizer targets 120">— fps</span>
+    <button class="glass-btn anim-btn" id="animToggle" aria-pressed="false" title="Toggle interface animations">Animations off</button>
+    <button class="glass-btn" id="fullscreenBtn" title="Full screen">⤢</button>
+  </header>
+
+  <!-- Lyrics stage -->
+  <main class="stage-wrap">
+    <p class="track-label" id="trackLabel">Demo Beat — original loop, lyrics built in</p>
+    <div class="lyrics" id="lyricsBox" aria-live="polite">
+      <p class="lyric-line prev" id="linePrev">&nbsp;</p>
+      <p class="lyric-line current" id="lineCurrent">Press play — lyrics light up here, word by word</p>
+      <p class="lyric-line next" id="lineNext">&nbsp;</p>
+    </div>
+    <p class="hint" id="stageHint">Tip: in Constellation mode the words of the current line join up like stars.</p>
+  </main>
+
+  <!-- Control sheet -->
+  <section class="glass sheet" id="sheet">
+
+    <!-- Audio source -->
+    <div class="row">
+      <span class="row-label">Source</span>
+      <div class="segmented small" id="sourcePicker">
+        <button class="seg active" data-source="demo">Demo Beat</button>
+        <button class="seg" data-source="file">Local File</button>
+        <button class="seg" data-source="live">Spotify / Live</button>
+      </div>
+      <span class="source-actions">
+        <label class="pill-btn" id="filePickLabel" hidden>
+          Choose audio file
+          <input type="file" id="fileInput" accept="audio/*" hidden>
+        </label>
+        <button class="pill-btn" id="liveBtn" hidden>Share Spotify audio</button>
+        <button class="pill-btn ghost" id="micBtn" hidden>Use microphone</button>
+      </span>
+    </div>
+
+    <!-- Lyrics search / custom lyrics -->
+    <div class="row wrap">
+      <span class="row-label">Lyrics</span>
+      <input class="field" id="trackInput" type="text" placeholder="Track name — e.g. Sweater Weather">
+      <input class="field" id="artistInput" type="text" placeholder="Artist — e.g. The Neighbourhood">
+      <button class="pill-btn accent" id="searchBtn">Search lyrics</button>
+      <button class="pill-btn ghost" id="customToggle">Custom lyrics</button>
+      <span class="offset-group" title="Nudge lyrics earlier or later">
+        <button class="mini-btn" id="offsetMinus">− 0.5s</button>
+        <span class="offset-value" id="offsetValue">0.0s</span>
+        <button class="mini-btn" id="offsetPlus">+ 0.5s</button>
+      </span>
+    </div>
+
+    <div class="row" id="resultsRow" hidden>
+      <div class="results" id="resultsBox"></div>
+    </div>
+
+    <div class="row" id="customRow" hidden>
+      <textarea id="customLyrics" class="field area" rows="5"
+        placeholder="Paste LRC lyrics here, one line per timestamp:&#10;[00:06.70] And all I am is a man&#10;[00:10.20] I want the world in my hands"></textarea>
+      <button class="pill-btn accent" id="customLoad">Load these lyrics</button>
+    </div>
+
+    <!-- Player bar -->
+    <div class="player">
+      <button class="play-btn" id="playBtn" aria-label="Play or pause">▶</button>
+      <span class="time" id="timeNow">0:00</span>
+      <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" aria-label="Seek">
+      <span class="time" id="timeTotal">0:32</span>
+      <label class="frost">
+        Frost
+        <input type="range" id="frostRange" min="45" max="92" value="74">
+      </label>
+    </div>
+
+    <div class="theme-sep" aria-hidden="true"></div>
+
+    <!-- Desktop downloads — the v1.0.0 GitHub release -->
+    <div class="row wrap">
+      <span class="row-label">Download</span>
+      <a class="pill-btn accent" href="https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.0/LyricViz_1.0.0_x64-setup.exe">Windows .exe · v1.0.0</a>
+      <a class="pill-btn" href="https://github.com/m4sternoob/m4ster-lyricviz/releases/download/v1.0.0/LyricViz_1.0.0_aarch64.dmg">macOS .dmg · v1.0.0</a>
+      <span class="dl-note">Desktop builds are unsigned — your OS may ask you to confirm the first launch.</span>
+    </div>
+
+    <p class="fineprint">
+      Lyrics come from LRCLIB, a free community database — no account, no sign-in.
+      Live mode never records or uploads your audio; analysis happens on this device only.
+    </p>
+  </section>
+</div>
+
+<!-- Back to top — bottom-left, appears once the control sheet is scrolled -->
+<button class="jump-top" id="jumpTop" hidden aria-label="Back to top">↑</button>
+
+<!-- Hidden audio element used for local files -->
+<audio id="fileAudio" preload="metadata"></audio>
+
+<script src="js/lyrics.js"></script>
+<script src="js/visualizer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
