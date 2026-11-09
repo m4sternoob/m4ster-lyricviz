@@ -21,6 +21,18 @@
    their own display value, which would otherwise override it. */
 [hidden] { display: none !important; }
 
+/* Visible keyboard focus everywhere — one clear cyan ring.
+   Several controls remove the default outline, so this rule is
+   the only focus signal keyboard users get. */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+input[type="range"]:focus-visible {
+  outline-offset: 4px;
+}
+
 html, body { height: 100%; }
 
 body {
@@ -128,7 +140,8 @@ body.anim-on .brand-mark { animation: mark-breathe 4.5s ease-in-out infinite; }
 }
 
 .brand-name { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.brand-name em { font-style: normal; color: var(--cyan); }
+/* One colour for the whole wordmark — no split-colour headline. */
+.brand-name em { font-style: normal; }
 
 .bar .segmented { margin-left: auto; }
 
@@ -421,7 +434,13 @@ body.anim-on .theme-sep { animation: sep-flow 6s linear infinite; }
 
 @media (max-width: 640px) {
   .brand-name { display: none; }
-  .bar { gap: 8px; }
+  /* The full bar cannot fit one row on a phone: drop the fps
+     pill and let the mode picker take its own full-width row
+     instead of clipping off-screen. */
+  .fps-pill { display: none; }
+  .bar { gap: 8px; flex-wrap: wrap; border-radius: 28px; }
+  .bar .segmented { order: 3; width: 100%; margin-left: 0; }
+  .bar .segmented .seg { flex: 1; }
   .seg { padding: 7px 10px; font-size: 13px; }
   .row-label { display: none; }
   .sheet { max-height: 52dvh; }
@@ -429,4 +448,8 @@ body.anim-on .theme-sep { animation: sep-flow 6s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .brand-mark, .theme-sep { animation: none !important; }
+  .seg, .lyric-line, .lyric-line.current .word, .play-btn,
+  .glass-btn, .pill-btn, .mini-btn, .jump-top {
+    transition: none !important;
+  }
 }
