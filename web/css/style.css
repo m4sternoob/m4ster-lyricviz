@@ -1,0 +1,432 @@
+/* LyricViz — iOS-style liquid glass over a live canvas stage.
+   Palette shared with the rest of the fleet:
+   ink #0b0e14, panel #12161f, edge #232a38, cyan #22d3ee,
+   text #e8ecf3, secondary #94a3b8, indigo #818cf8. */
+
+:root {
+  --ink: #0b0e14;
+  --panel: #12161f;
+  --edge: #232a38;
+  --cyan: #22d3ee;
+  --indigo: #818cf8;
+  --text: #e8ecf3;
+  --secondary: #94a3b8;
+  /* Frost controls how solid the glass feels. 74 is the fleet default. */
+  --frost: 74;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* The hidden attribute must always win — several components set
+   their own display value, which would otherwise override it. */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "Segoe UI", Inter, Roboto, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Stage ---------------------------------------------------- */
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Keep the canvas on its own GPU layer. */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Small live frame-rate readout in the top bar. */
+.fps-pill {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Soft shade so lyrics stay readable over bright visuals. */
+.stage-shade {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 40%, rgba(11, 14, 20, 0.55) 100%);
+}
+
+.app {
+  position: relative;
+  z-index: 2;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 14px clamp(12px, 3vw, 28px) 16px;
+  gap: 10px;
+}
+
+/* ---- Glass ---------------------------------------------------- */
+/* One glass recipe everywhere: translucent panel, strong blur,
+   a light edge, and a soft shadow. The --frost value (45–92)
+   mixes more or less solid panel colour into the glass. */
+
+.glass {
+  background: color-mix(in srgb, var(--panel) calc(var(--frost) * 1%), transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+.bar {
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px 8px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+/* Interface animations are OFF by default. The Animations toggle
+   in the top bar adds body.anim-on, which is the only state where
+   decorative motion (like this mark breathing) runs. */
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+body.anim-on .brand-mark { animation: mark-breathe 4.5s ease-in-out infinite; }
+
+@keyframes mark-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.0); }
+  50% { box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.28); }
+}
+
+.brand-name { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.brand-name em { font-style: normal; color: var(--cyan); }
+
+.bar .segmented { margin-left: auto; }
+
+.glass-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.glass-btn:active { transform: scale(0.93); }
+.anim-btn {
+  width: auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- Segmented control (iOS style) ---------------------------- */
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.seg {
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+.seg:active { transform: scale(0.95); }
+.seg.active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #11141c;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+.segmented.small .seg { font-size: 13px; padding: 6px 11px; }
+
+/* ---- Lyrics stage --------------------------------------------- */
+
+.stage-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+  padding: 0 clamp(8px, 6vw, 90px);
+  min-height: 0;
+}
+
+.track-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+
+.lyrics { display: flex; flex-direction: column; gap: 14px; }
+
+.lyric-line {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  transition: opacity 0.3s ease;
+}
+.lyric-line.prev, .lyric-line.next {
+  font-size: clamp(17px, 2.6vw, 27px);
+  color: rgba(232, 236, 243, 0.38);
+  font-weight: 600;
+}
+.lyric-line.current {
+  font-size: clamp(28px, 5.2vw, 54px);
+  color: rgba(232, 236, 243, 0.42);
+}
+
+/* Words light up one by one as they are sung. Future words in the
+   current line stay dim; sung words turn full white with a glow. */
+.lyric-line.current .word { transition: color 0.15s ease, text-shadow 0.15s ease; }
+.lyric-line.current .word.sung {
+  color: #fff;
+  text-shadow: 0 0 22px rgba(34, 211, 238, 0.65), 0 0 46px rgba(129, 140, 248, 0.4);
+}
+.lyric-line.current .word.now { color: var(--cyan); }
+
+.hint { font-size: 13px; color: var(--secondary); }
+
+/* ---- Control sheet -------------------------------------------- */
+
+.sheet {
+  border-radius: 28px;
+  padding: 16px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 46dvh;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.row.wrap { flex-wrap: wrap; }
+
+.row-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.source-actions { display: flex; gap: 8px; }
+
+.pill-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+a.pill-btn { text-decoration: none; }
+.dl-note { font-size: 12.5px; color: var(--secondary); }
+.pill-btn:active { transform: scale(0.95); }
+.pill-btn.accent { background: var(--cyan); border-color: transparent; color: #06222a; }
+.pill-btn.ghost { background: transparent; }
+
+.field {
+  flex: 1;
+  min-width: 150px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 13px;
+  outline: none;
+}
+.field:focus { border-color: var(--cyan); }
+.field::placeholder { color: rgba(148, 163, 184, 0.75); }
+.field.area { width: 100%; resize: vertical; line-height: 1.5; }
+
+.offset-group { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.offset-value { font-size: 13px; color: var(--secondary); min-width: 38px; text-align: center; }
+.mini-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+}
+.mini-btn:active { transform: scale(0.93); }
+
+.results { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.result-item {
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 9px 13px;
+  font: inherit; font-size: 14px;
+  cursor: pointer;
+  display: flex; justify-content: space-between; gap: 12px;
+}
+.result-item:hover { border-color: var(--cyan); }
+.result-item .meta { color: var(--secondary); font-size: 12.5px; white-space: nowrap; }
+.result-item .no-sync { color: #f0abfc; font-size: 12.5px; }
+
+/* ---- Player bar ----------------------------------------------- */
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.play-btn {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  color: #11141c;
+  font-size: 19px;
+  cursor: pointer;
+  display: grid; place-items: center;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+.play-btn:active { transform: scale(0.93); }
+
+.time { font-size: 12.5px; color: var(--secondary); min-width: 34px; text-align: center; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+  cursor: pointer;
+}
+#seekBar { flex: 1; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #fff; border: 0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #fff; border: 0;
+}
+
+.frost {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--secondary); font-weight: 600;
+}
+.frost input { width: 84px; }
+
+.fineprint { font-size: 12px; color: rgba(148, 163, 184, 0.8); text-align: center; }
+
+/* Themed separator — a 2px glowing gradient line in the app's own
+   theme colours (cyan into indigo). It flows only when the master
+   Animations toggle is on; otherwise it sits as a static gradient. */
+.theme-sep {
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--cyan));
+  background-size: 200% 100%;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+body.anim-on .theme-sep { animation: sep-flow 6s linear infinite; }
+@keyframes sep-flow { to { background-position: 200% 0; } }
+.player { padding-top: 4px; }
+
+/* Back-to-top — fixed bottom-left, 46px round, same glass recipe
+   as the other round controls. JS shows it once the sheet scrolls. */
+.jump-top {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+.jump-top:active { transform: scale(0.93); }
+
+@media (max-width: 640px) {
+  .brand-name { display: none; }
+  .bar { gap: 8px; }
+  .seg { padding: 7px 10px; font-size: 13px; }
+  .row-label { display: none; }
+  .sheet { max-height: 52dvh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark, .theme-sep { animation: none !important; }
+}
