@@ -273,7 +273,10 @@ body.anim-on .brand-mark { animation: mark-breathe 4.5s ease-in-out infinite; }
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--secondary);
-  width: 52px;
+  /* 88px fits the longest label ("Download", measured 83.5px) —
+     at the old 52px its last letter slid under the first button
+     and vanished. */
+  width: 88px;
   flex-shrink: 0;
 }
 
