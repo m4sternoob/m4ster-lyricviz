@@ -1,0 +1,10 @@
+# Rust / Tauri build output
+/src-tauri/target/
+node_modules/
+*.dmg
+*.exe
+*.zip
+.DS_Store
+
+# Local preview screenshots — not part of the app
+/preview*.png
