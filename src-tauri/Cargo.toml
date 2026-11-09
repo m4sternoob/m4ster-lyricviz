@@ -1,6 +1,6 @@
 [package]
 name = "lyricviz"
-version = "1.0.0"
+version = "1.0.1"
 description = "LyricViz — a lyric visualizer with synced, word-by-word lyrics"
 authors = ["m4sternoob"]
 edition = "2021"
