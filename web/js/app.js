@@ -631,7 +631,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closePanels();
 });
 
-// ---------- Animations master toggle (off by default) ----------
+// ---------- Animations master toggle (on by default) ----------
+// Fleet rule (2026-11-10): animations ON by default everywhere.
+// A saved choice always wins; with no saved choice, the OS
+// reduced-motion setting still starts them off.
 
 const animToggle = el("animToggle");
 function applyAnimations(on) {
@@ -642,7 +645,10 @@ function applyAnimations(on) {
 }
 animToggle.addEventListener("click", () =>
   applyAnimations(!document.body.classList.contains("anim-on")));
-applyAnimations(localStorage.getItem("m4ster.lyricviz.animations") === "on");
+
+const savedAnimations = localStorage.getItem("m4ster.lyricviz.animations");
+const osReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+applyAnimations(savedAnimations !== null ? savedAnimations === "on" : !osReducedMotion);
 
 // ---------- Back to top (bottom-left) ----------
 // The page itself is one screen tall; the control sheet is what
